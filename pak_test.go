@@ -302,3 +302,21 @@ func FuzzOpen(f *testing.F) {
 		}
 	})
 }
+
+type zeroReaderAt struct{ read int }
+
+func (z *zeroReaderAt) ReadAt(b []byte, _ int64) (int, error) {
+	z.read += len(b)
+	return len(b), nil
+}
+
+func TestReadRefusesOversizedLZ4DiskSize(t *testing.T) {
+	t.Parallel()
+
+	z := &zeroReaderAt{}
+	p := &Pak{r: z, entries: []Entry{{Path: "a", Size: 10, Compression: CompressionLZ4, diskSize: 1 << 28}}}
+
+	if _, err := p.readEntry(&p.entries[0]); !errors.Is(err, ErrInvalid) || z.read != 0 {
+		t.Fatalf("err = %v, read %d bytes", err, z.read)
+	}
+}

@@ -6,6 +6,12 @@ Notable changes to `go-larian`. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-02
+
+### Fixed
+
+- `Read` refuses an LZ4 entry whose stored size exceeds what LZ4 can produce for its uncompressed size, before reading it.
+
 ## [0.1.0] - 2026-11-02
 
 ### Added
@@ -16,5 +22,6 @@ Notable changes to `go-larian`. The format follows
 - Parse and write `modsettings.lsx` load orders (`ParseModSettings`, `FormatModSettings`).
 - `lariantest.BuildPak`: build in-memory LSPK v15, v16 and v18 fixtures for tests.
 
-[Unreleased]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rethunk-Tech/go-larian/releases/tag/v0.1.0

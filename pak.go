@@ -317,6 +317,10 @@ func (p *Pak) readEntry(e *Entry) ([]byte, error) {
 
 		return readExactly(zr, e)
 	case CompressionLZ4:
+		if e.diskSize > e.Size+e.Size/255+16 {
+			return nil, fmt.Errorf("%w: %q is larger on disk than LZ4 allows", ErrInvalid, e.Path)
+		}
+
 		src, err := io.ReadAll(disk)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %q: %w", ErrInvalid, e.Path, err)
