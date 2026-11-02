@@ -11,8 +11,7 @@
 
 Readers for Larian Studios mod formats (LSPK .pak archives, meta.lsx, modsettings.lsx) as Baldur's Gate 3 uses them. Package `larian`, module `github.com/Rethunk-Tech/go-larian`.
 
-<!-- scaffold: one short paragraph on what the package guarantees and why it exists, in plain
-words. -->
+Reads Baldur's Gate 3 mod packages without extracting them to disk, and writes the load-order file the game reads. Every size, offset, count and path in a package is treated as hostile, so a crafted `.pak` is an error, never a panic or an unbounded allocation.
 
 ## Quick start
 
@@ -24,7 +23,11 @@ A worked example and the contracts: [HUMANS.md](HUMANS.md).
 
 ## Features
 
-<!-- scaffold: 3 to 6 bullets, each a capability a caller can rely on. No roadmap. -->
+- Open an LSPK `.pak` (versions 15, 16, 18), list its files and read one by path (stored, zlib or LZ4).
+- Read a mod's `Mods/<Folder>/meta.lsx` into a `ModuleInfo`.
+- Split and build Larian's packed `Version64`.
+- Parse and write `modsettings.lsx` load orders, base-game entries included.
+- Reject unsafe stored paths (`..`, absolute, drive-lettered) when the package is opened.
 
 ## Documentation
 

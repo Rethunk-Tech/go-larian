@@ -14,10 +14,12 @@ Please do not open a public issue for a suspected vulnerability first.
 
 ## What is in scope
 
-<!-- scaffold: the untrusted inputs this package handles, and each property a crafted input must not
-break (an escape, an unbounded allocation, a panic). One bullet each, naming the API. -->
+- A `.pak` passed to `Open`, `OpenFile` and `Pak.Read`: header offsets, file-list size, entry count, per-entry offset, sizes and compressed streams are untrusted. A crafted package must not panic, read outside the package, or allocate beyond `MaxEntries` and `MaxEntrySize`.
+- Stored file names: a name that is absolute, drive-lettered, empty-segmented or contains `.` or `..` must never reach a caller, so `Entry.Path` is safe to join under a directory.
+- `.lsx` documents passed to `ParseMeta` and `ParseModSettings`: size-capped at 8 MiB; no external entities are resolved.
 
 ## What is out of scope
 
-<!-- scaffold: what the caller is trusted to have checked already, and behaviour that is intended
-rather than a vulnerability. -->
+- Joining `Entry.Path` to a destination and writing it safely (symlinks in the destination, total bytes written) is the caller's job; this package never writes files.
+- Total decompressed bytes across many entries are not capped; a caller extracting a whole package sets its own budget.
+- Mod UUIDs, names and MD5 values are reported as stored and not verified.
