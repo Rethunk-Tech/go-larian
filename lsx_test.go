@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func fixture(t *testing.T, name string) []byte {
+func fixture(t testing.TB, name string) []byte {
 	t.Helper()
 
 	b, err := fs.ReadFile(os.DirFS("testdata"), name)
@@ -125,4 +125,14 @@ func TestFormatModSettingsEscapes(t *testing.T) {
 	if err != nil || len(back) != 1 || back[0].Name != m.Name || back[0].Folder != m.Folder {
 		t.Fatalf("%+v %v", back, err)
 	}
+}
+
+func FuzzParseMeta(f *testing.F) {
+	f.Add(fixture(f, "meta.lsx"))
+	f.Add(fixture(f, "modsettings.lsx"))
+	f.Add([]byte(`<save><region id="Config"><node id="ModuleInfo"/></region></save>`))
+	f.Fuzz(func(_ *testing.T, data []byte) {
+		_, _ = ParseMeta(data)
+		_, _ = ParseModSettings(data)
+	})
 }

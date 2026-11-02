@@ -6,6 +6,10 @@ Notable changes to `go-larian`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Fuzz seeds for `Open` and a `FuzzParseMeta` over `ParseMeta` and `ParseModSettings`.
+
 ## [0.1.1] - 2026-11-02
 
 ### Fixed
