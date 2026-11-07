@@ -6,9 +6,15 @@ Notable changes to `go-larian`. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-07
+
 ### Added
 
 - Fuzz seeds for `Open` and a `FuzzParseMeta` over `ParseMeta` and `ParseModSettings`.
+
+### Fixed
+
+- `pak` accepts deletion marks, refuses names Windows cannot hold and FIFOs, and bounds declared sizes.
 
 ## [0.1.1] - 2026-11-02
 
@@ -26,6 +32,7 @@ Notable changes to `go-larian`. The format follows
 - Parse and write `modsettings.lsx` load orders (`ParseModSettings`, `FormatModSettings`).
 - `lariantest.BuildPak`: build in-memory LSPK v15, v16 and v18 fixtures for tests.
 
-[Unreleased]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rethunk-Tech/go-larian/releases/tag/v0.1.0
