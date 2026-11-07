@@ -231,7 +231,7 @@ func TestOpenRejectsHostileInput(t *testing.T) {
 func TestOpenRejectsUnsafePathsAndBounds(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{"../evil", "a/../../evil", "/abs", "C:/win", "a//b", "./a", `..\evil`} {
+	for _, name := range []string{"../evil", "a/../../evil", "/abs", "C:/win", "a//b", "./a", `..\evil`, "Mods/.. /x", "Mods/a.", "Mods/a:b", "Mods/CON", "Mods/nul.txt", "Mods/Com1 .x"} {
 		if _, err := openBytes(t, buildPak(t, 18, []fixtureFile{{name: name, data: []byte("x"), comp: CompressionNone}})); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%q: want ErrInvalid, got %v", name, err)
 		}
@@ -319,5 +319,36 @@ func TestReadRefusesOversizedLZ4DiskSize(t *testing.T) {
 
 	if _, err := p.readEntry(&p.entries[0]); !errors.Is(err, ErrInvalid) || z.read != 0 {
 		t.Fatalf("err = %v, read %d bytes", err, z.read)
+	}
+}
+
+func TestOpenSkipsDeletionMarksWithoutBoundsChecking(t *testing.T) {
+	t.Parallel()
+
+	b := buildPak(t, 18, []fixtureFile{
+		{name: "Mods/A/meta.lsx", offset: deletionMark},
+		{name: "Mods/A/kept.txt", data: []byte("x"), comp: CompressionNone},
+	})
+
+	p, err := openBytes(t, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if es := p.Entries(); len(es) != 1 || es[0].Path != "Mods/A/kept.txt" {
+		t.Fatalf("entries = %+v", es)
+	}
+}
+
+func TestReadRefusesSizesCompressionCannotReach(t *testing.T) {
+	t.Parallel()
+
+	for _, comp := range []Compression{CompressionZlib, CompressionLZ4} {
+		z := &zeroReaderAt{}
+		p := &Pak{r: z, entries: []Entry{{Path: "a", Size: MaxEntrySize, Compression: comp, diskSize: 12}}}
+
+		if _, err := p.readEntry(&p.entries[0]); !errors.Is(err, ErrInvalid) || z.read != 0 {
+			t.Fatalf("compression %d: err = %v, read %d bytes", comp, err, z.read)
+		}
 	}
 }

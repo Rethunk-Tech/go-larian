@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"syscall"
 
 	"github.com/pierrec/lz4/v4"
 )
@@ -31,6 +32,10 @@ const (
 	flagSolid = 0x04
 	// deletionMark marks (in the low 48 offset bits) a patch entry that deletes a file.
 	deletionMark = 0xbeefdeadbeef
+
+	// The most a compressed stream can expand by; a declared size past it is refused before the output is allocated.
+	maxDeflateRatio = 1032
+	maxLZ4Ratio     = 255
 )
 
 // Errors returned by this package; test with [errors.Is].
@@ -81,7 +86,8 @@ type Pak struct {
 
 // OpenFile opens the package at path. Close it when done.
 func OpenFile(path string) (*Pak, error) {
-	f, err := os.Open(path) //nolint:gosec // opening the caller-named package is the function's purpose
+	// O_NONBLOCK keeps the open of a FIFO from waiting for a writer; the regular-file check below then refuses it.
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0) //nolint:gosec // opening the caller-named package is the function's purpose
 	if err != nil {
 		return nil, fmt.Errorf("larian: %w", err)
 	}
@@ -91,6 +97,12 @@ func OpenFile(path string) (*Pak, error) {
 		_ = f.Close()
 
 		return nil, fmt.Errorf("larian: %w", err)
+	}
+
+	if !st.Mode().IsRegular() {
+		_ = f.Close()
+
+		return nil, fmt.Errorf("%w: %s is not a regular file", ErrInvalid, path)
 	}
 
 	p, err := Open(f, st.Size())
@@ -203,7 +215,7 @@ func (p *Pak) parseTable(table []byte, entryLen int) error {
 			return err
 		}
 
-		if e.offset&(1<<48-1) == deletionMark {
+		if e.deletes() {
 			continue
 		}
 
@@ -250,12 +262,15 @@ func (p *Pak) parseEntry(b []byte, entryLen int) (Entry, error) {
 		e.Size = e.diskSize
 	}
 
-	if e.part == 0 && (e.offset > p.size || e.diskSize > p.size-e.offset) {
+	if e.part == 0 && !e.deletes() && (e.offset > p.size || e.diskSize > p.size-e.offset) {
 		return Entry{}, fmt.Errorf("%w: %q data out of bounds", ErrInvalid, clean)
 	}
 
 	return e, nil
 }
+
+// deletes reports a patch entry that removes a file; its offset is a marker, not a position.
+func (e *Entry) deletes() bool { return e.offset&(1<<48-1) == deletionMark }
 
 // cleanPath normalises a stored name to a safe relative slash path.
 func cleanPath(name string) (string, bool) {
@@ -265,16 +280,31 @@ func cleanPath(name string) (string, bool) {
 	}
 
 	for seg := range strings.SplitSeq(name, "/") {
-		if seg == "" || seg == "." || seg == ".." {
+		if seg == "" || seg == "." || seg == ".." || !windowsSafeSegment(seg) {
 			return "", false
 		}
 	}
 
-	if first, _, _ := strings.Cut(name, "/"); strings.Contains(first, ":") {
-		return "", false
+	return name, true
+}
+
+// windowsSafeSegment rejects what Windows resolves to something other than the stored name: a trailing dot or space
+// is stripped (so ".. " becomes ".."), ":" opens an alternate data stream or a drive, and a device name ("CON",
+// "NUL.txt") names the device.
+func windowsSafeSegment(seg string) bool {
+	if strings.ContainsRune(seg, ':') || strings.HasSuffix(seg, ".") || strings.HasSuffix(seg, " ") {
+		return false
 	}
 
-	return name, true
+	stem, _, _ := strings.Cut(seg, ".")
+	switch strings.ToUpper(strings.TrimRight(stem, " ")) {
+	case "CON", "PRN", "AUX", "NUL",
+		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		return false
+	}
+
+	return true
 }
 
 // Entries lists the package's files in stored order. The slice is a copy.
@@ -308,6 +338,10 @@ func (p *Pak) readEntry(e *Entry) ([]byte, error) {
 	case CompressionNone:
 		return readExactly(disk, e)
 	case CompressionZlib:
+		if e.Size > e.diskSize*maxDeflateRatio {
+			return nil, fmt.Errorf("%w: %q claims more than deflate can expand to", ErrInvalid, e.Path)
+		}
+
 		zr, err := zlib.NewReader(disk)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %q: %w", ErrInvalid, e.Path, err)
@@ -319,6 +353,10 @@ func (p *Pak) readEntry(e *Entry) ([]byte, error) {
 	case CompressionLZ4:
 		if e.diskSize > e.Size+e.Size/255+16 {
 			return nil, fmt.Errorf("%w: %q is larger on disk than LZ4 allows", ErrInvalid, e.Path)
+		}
+
+		if e.Size > e.diskSize*maxLZ4Ratio {
+			return nil, fmt.Errorf("%w: %q claims more than LZ4 can expand to", ErrInvalid, e.Path)
 		}
 
 		src, err := io.ReadAll(disk)
