@@ -308,7 +308,7 @@ func FuzzOpen(f *testing.F) {
 				t.Fatalf("unsafe path survived Open: %q", e.Path)
 			}
 
-			for _, seg := range strings.Split(e.Path, "/") {
+			for seg := range strings.SplitSeq(e.Path, "/") {
 				if seg == "" || seg == "." || seg == ".." {
 					t.Fatalf("unsafe path survived Open: %q", e.Path)
 				}
