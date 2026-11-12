@@ -387,8 +387,12 @@ func readExactly(r io.Reader, e *Entry) ([]byte, error) {
 	}
 
 	var extra [1]byte
-	if n, _ := r.Read(extra[:]); n != 0 {
+	n, err := r.Read(extra[:])
+	if n != 0 {
 		return nil, fmt.Errorf("%w: %q is longer than its recorded size", ErrInvalid, e.Path)
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("%w: %q: %w", ErrInvalid, e.Path, err)
 	}
 
 	return buf, nil

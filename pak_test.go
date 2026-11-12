@@ -374,3 +374,21 @@ func TestReadRefusesSizesCompressionCannotReach(t *testing.T) {
 		}
 	}
 }
+
+func TestReadRejectsCorruptZlibChecksum(t *testing.T) {
+	t.Parallel()
+
+	b := buildPak(t, 18, []fixtureFile{{name: "Mods/x/x.txt", data: []byte("hello"), comp: CompressionZlib}})
+	listOff := binary.LittleEndian.Uint64(b[8:])
+	b[listOff-1] ^= 1
+
+	p, err := openBytes(t, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = p.Read("Mods/x/x.txt")
+	if !errors.Is(err, ErrInvalid) {
+		t.Fatalf("Read: %v", err)
+	}
+}
