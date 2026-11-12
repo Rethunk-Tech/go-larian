@@ -131,8 +131,29 @@ func FuzzParseMeta(f *testing.F) {
 	f.Add(fixture(f, "meta.lsx"))
 	f.Add(fixture(f, "modsettings.lsx"))
 	f.Add([]byte(`<save><region id="Config"><node id="ModuleInfo"/></region></save>`))
-	f.Fuzz(func(_ *testing.T, data []byte) {
-		_, _ = ParseMeta(data)
-		_, _ = ParseModSettings(data)
+	f.Fuzz(func(t *testing.T, data []byte) {
+		m, err := ParseMeta(data)
+		if err == nil && m.UUID == "" {
+			t.Fatal("ParseMeta succeeded with empty UUID")
+		}
+	})
+}
+
+func FuzzParseModSettings(f *testing.F) {
+	f.Add(fixture(f, "modsettings.lsx"))
+	f.Add(fixture(f, "meta.lsx"))
+	f.Add(FormatModSettings(nil))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		mods, err := ParseModSettings(data)
+		if err != nil {
+			return
+		}
+
+		out := FormatModSettings(mods)
+
+		back, err := ParseModSettings(out)
+		if err != nil || !reflect.DeepEqual(back, mods) {
+			t.Fatalf("round trip: %+v %v", back, err)
+		}
 	})
 }

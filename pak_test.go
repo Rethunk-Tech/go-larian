@@ -298,8 +298,30 @@ func FuzzOpen(f *testing.F) {
 			return
 		}
 
-		for _, e := range p.Entries() {
-			_, _ = p.Read(e.Path)
+		entries := p.Entries()
+		if len(entries) > MaxEntries {
+			t.Fatalf("Entries() = %d, MaxEntries = %d", len(entries), MaxEntries)
+		}
+
+		for _, e := range entries {
+			if e.Path == "" || strings.HasPrefix(e.Path, "/") {
+				t.Fatalf("unsafe path survived Open: %q", e.Path)
+			}
+
+			for _, seg := range strings.Split(e.Path, "/") {
+				if seg == "" || seg == "." || seg == ".." {
+					t.Fatalf("unsafe path survived Open: %q", e.Path)
+				}
+			}
+
+			got, err := p.Read(e.Path)
+			if err != nil {
+				continue
+			}
+
+			if uint64(len(got)) != e.Size {
+				t.Fatalf("%q: Read returned %d bytes, Size = %d", e.Path, len(got), e.Size)
+			}
 		}
 	})
 }
