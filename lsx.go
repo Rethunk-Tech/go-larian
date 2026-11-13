@@ -90,7 +90,7 @@ func moduleFromNode(n *lsxNode) (ModuleInfo, error) {
 		case "MD5":
 			m.MD5 = a.Value
 		case "Version64", "Version":
-			v, err := strconv.ParseUint(a.Value, 10, 63)
+			v, err := strconv.ParseUint(a.Value, 10, 64)
 			if err != nil {
 				return m, fmt.Errorf("%w: Version64 %q", ErrInvalid, a.Value)
 			}

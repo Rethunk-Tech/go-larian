@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -156,4 +157,16 @@ func FuzzParseModSettings(f *testing.F) {
 			t.Fatalf("round trip: %+v %v", back, err)
 		}
 	})
+}
+
+func TestParseMetaAcceptsMajorAbove255(t *testing.T) {
+	t.Parallel()
+
+	want := NewVersion64(300, 1, 2, 3)
+	doc := `<save><region id="Config"><node id="ModuleInfo"><attribute id="UUID" value="u"/><attribute id="Version64" value="` + strconv.FormatUint(uint64(want), 10) + `"/></node></region></save>`
+
+	m, err := ParseMeta([]byte(doc))
+	if err != nil || m.Version64 != want {
+		t.Fatalf("%v %v, want %v", m.Version64, err, want)
+	}
 }
