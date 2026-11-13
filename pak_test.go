@@ -296,7 +296,13 @@ func TestReadBadEntries(t *testing.T) {
 }
 
 func FuzzOpen(f *testing.F) {
-	f.Add(buildPak(f, 18, []fixtureFile{{name: "a.txt", data: bytes.Repeat([]byte("a"), 99), comp: CompressionLZ4}}))
+	for _, v := range []uint32{15, 16, 18} {
+		f.Add(buildPak(f, v, []fixtureFile{
+			{name: "Mods/A/meta.lsx", data: fixture(f, "meta.lsx"), comp: CompressionZlib},
+			{name: "a.txt", data: bytes.Repeat([]byte("a"), 99), comp: CompressionLZ4},
+			{name: "b/raw.bin", data: []byte("raw"), comp: CompressionNone},
+		}))
+	}
 	f.Add([]byte("LSPK"))
 	f.Add([]byte("LSPK\x12\x00\x00\x00\x28\x00\x00\x00\x00\x00\x00\x00"))
 	f.Fuzz(func(t *testing.T, data []byte) {
