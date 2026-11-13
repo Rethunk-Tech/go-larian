@@ -242,6 +242,11 @@ func TestOpenRejectsUnsafePathsAndBounds(t *testing.T) {
 		t.Errorf("duplicate: %v", err)
 	}
 
+	folded := []fixtureFile{{name: "Mods/A.txt", data: []byte("1"), comp: CompressionNone}, {name: "Mods/a.TXT", data: []byte("2"), comp: CompressionNone}}
+	if _, err := openBytes(t, buildPak(t, 18, folded)); !errors.Is(err, ErrInvalid) {
+		t.Errorf("case collision: %v", err)
+	}
+
 	// Entry data pointing past the end of the package.
 	b := buildPak(t, 18, []fixtureFile{{name: "a", data: []byte("12345"), comp: CompressionNone}})
 	// Rebuild the table with a huge size via a second pak: patch is awkward under LZ4, so build directly.

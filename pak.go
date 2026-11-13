@@ -208,6 +208,7 @@ func (p *Pak) parseTable(table []byte, entryLen int) error {
 
 	p.entries = make([]Entry, 0, count)
 	p.index = make(map[string]int, count)
+	folded := make(map[string]string, count)
 
 	for i := range int(count) {
 		e, err := p.parseEntry(raw[i*entryLen:(i+1)*entryLen], entryLen)
@@ -223,6 +224,13 @@ func (p *Pak) parseTable(table []byte, entryLen int) error {
 			return fmt.Errorf("%w: duplicate path %q", ErrInvalid, e.Path)
 		}
 
+		// Larian's tools treat paths case-insensitively, and Windows and macOS extraction would overwrite one with the other.
+		key := strings.ToLower(e.Path)
+		if other, clash := folded[key]; clash {
+			return fmt.Errorf("%w: paths %q and %q differ only by case", ErrInvalid, other, e.Path)
+		}
+
+		folded[key] = e.Path
 		p.index[e.Path] = len(p.entries)
 		p.entries = append(p.entries, e)
 	}
