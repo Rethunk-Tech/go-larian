@@ -231,7 +231,7 @@ func TestOpenRejectsHostileInput(t *testing.T) {
 func TestOpenRejectsUnsafePathsAndBounds(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{"../evil", "a/../../evil", "/abs", "C:/win", "a//b", "./a", `..\evil`, "Mods/.. /x", "Mods/a.", "Mods/a:b", "Mods/CON", "Mods/nul.txt", "Mods/Com1 .x", "Mods/CONIN$/x", "Mods/CONOUT$.txt"} {
+	for _, name := range []string{"../evil", "a/../../evil", "/abs", "C:/win", "a//b", "./a", `..\evil`, "Mods/.. /x", "Mods/a.", "Mods/a:b", "Mods/CON", "Mods/nul.txt", "Mods/Com1 .x", "Mods/CONIN$/x", "Mods/CONOUT$.txt", "Mods/a?b", "Mods/a*", "Mods/a|b", "Mods/a<b", "Mods/a\x01b", "Mods/COM¹", "Mods/lpt³.txt"} {
 		if _, err := openBytes(t, buildPak(t, 18, []fixtureFile{{name: name, data: []byte("x"), comp: CompressionNone}})); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%q: want ErrInvalid, got %v", name, err)
 		}

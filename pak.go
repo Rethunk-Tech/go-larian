@@ -290,9 +290,9 @@ func cleanPath(name string) (string, bool) {
 
 // windowsSafeSegment rejects what Windows resolves to something other than the stored name: a trailing dot or space
 // is stripped (so ".. " becomes ".."), ":" opens an alternate data stream or a drive, and a device name ("CON",
-// "NUL.txt") names the device.
+// "NUL.txt", "COM¹") names the device; the reserved characters and control characters cannot appear in a Windows name.
 func windowsSafeSegment(seg string) bool {
-	if strings.ContainsRune(seg, ':') || strings.HasSuffix(seg, ".") || strings.HasSuffix(seg, " ") {
+	if strings.ContainsAny(seg, ":<>\"|?*") || strings.IndexFunc(seg, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 || strings.HasSuffix(seg, ".") || strings.HasSuffix(seg, " ") {
 		return false
 	}
 
@@ -300,7 +300,8 @@ func windowsSafeSegment(seg string) bool {
 	switch strings.ToUpper(strings.TrimRight(stem, " ")) {
 	case "CON", "CONIN$", "CONOUT$", "PRN", "AUX", "NUL",
 		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+		"COM¹", "COM²", "COM³", "LPT¹", "LPT²", "LPT³":
 		return false
 	}
 
