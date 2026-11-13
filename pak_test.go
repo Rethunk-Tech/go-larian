@@ -3,10 +3,12 @@ package larian
 import (
 	"bytes"
 	"compress/zlib"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -395,5 +397,37 @@ func TestReadRejectsCorruptZlibChecksum(t *testing.T) {
 	_, err = p.Read("Mods/x/x.txt")
 	if !errors.Is(err, ErrInvalid) {
 		t.Fatalf("Read: %v", err)
+	}
+}
+
+// A zlib entry's recorded size is only a claim: garbage that ends early must fail before the reader sizes a buffer
+// by it, so a small pak cannot make Read allocate a thousand times its own length.
+func TestReadZlibAllocatesByOutputNotClaim(t *testing.T) {
+	payload := make([]byte, 64<<10)
+	_, _ = rand.Read(payload)
+
+	b := buildPak(t, 18, []fixtureFile{{name: "z.bin", data: payload, comp: CompressionZlib}})
+
+	p, err := openBytes(t, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p.entries[0].Size = p.entries[0].diskSize * 1000
+
+	var before, after runtime.MemStats
+
+	runtime.ReadMemStats(&before)
+
+	_, err = p.Read("z.bin")
+
+	runtime.ReadMemStats(&after)
+
+	if !errors.Is(err, ErrInvalid) {
+		t.Fatalf("Read: %v", err)
+	}
+
+	if got := after.TotalAlloc - before.TotalAlloc; got > 8<<20 {
+		t.Fatalf("Read allocated %d bytes for a %d-byte entry", got, p.entries[0].diskSize)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -36,6 +37,8 @@ const (
 	// The most a compressed stream can expand by; a declared size past it is refused before the output is allocated.
 	maxDeflateRatio = 1032
 	maxLZ4Ratio     = 255
+	// readChunk is the least a decompressed read starts with.
+	readChunk = 64 << 10
 )
 
 // Errors returned by this package; test with [errors.Is].
@@ -390,9 +393,26 @@ func (p *Pak) readEntry(e *Entry) ([]byte, error) {
 
 // readExactly reads e.Size bytes and fails if the stream is shorter or longer.
 func readExactly(r io.Reader, e *Entry) ([]byte, error) {
-	buf := make([]byte, e.Size)
-	if _, err := io.ReadFull(r, buf); err != nil {
-		return nil, fmt.Errorf("%w: %q: %w", ErrInvalid, e.Path, err)
+	// e.Size is the header's claim, so the buffer grows only as the stream delivers: a short compressed stream
+	// cannot make it allocate up to maxDeflateRatio times its own length.
+	got := min(e.Size, max(e.diskSize, readChunk))
+	buf := make([]byte, got)
+
+	var done uint64
+
+	for {
+		if _, err := io.ReadFull(r, buf[done:]); err != nil {
+			return nil, fmt.Errorf("%w: %q: %w", ErrInvalid, e.Path, err)
+		}
+
+		if got == e.Size {
+			break
+		}
+
+		done = got
+		more := min(e.Size-got, got)
+		buf = slices.Concat(buf, make([]byte, more))
+		got += more
 	}
 
 	var extra [1]byte
