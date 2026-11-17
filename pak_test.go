@@ -248,11 +248,6 @@ func TestOpenRejectsUnsafePathsAndBounds(t *testing.T) {
 	if _, err := openBytes(t, buildPak(t, 18, folded)); !errors.Is(err, ErrInvalid) {
 		t.Errorf("case collision: %v", err)
 	}
-
-	// Entry data pointing past the end of the package.
-	b := buildPak(t, 18, []fixtureFile{{name: "a", data: []byte("12345"), comp: CompressionNone}})
-	// Rebuild the table with a huge size via a second pak: patch is awkward under LZ4, so build directly.
-	_ = b
 }
 
 func TestReadBadEntries(t *testing.T) {
