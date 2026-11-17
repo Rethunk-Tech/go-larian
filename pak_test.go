@@ -233,7 +233,7 @@ func TestOpenRejectsHostileInput(t *testing.T) {
 func TestOpenRejectsUnsafePathsAndBounds(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{"../evil", "a/../../evil", "/abs", "C:/win", "a//b", "./a", `..\evil`, "Mods/.. /x", "Mods/a.", "Mods/a:b", "Mods/CON", "Mods/nul.txt", "Mods/Com1 .x", "Mods/CONIN$/x", "Mods/CONOUT$.txt", "Mods/a?b", "Mods/a*", "Mods/a|b", "Mods/a<b", "Mods/a\x01b", "Mods/COM¹", "Mods/lpt³.txt"} {
+	for _, name := range []string{"../evil", "a/../../evil", "/abs", "C:/win", "a//b", "./a", `..\evil`, "Mods/.. /x", "Mods/a.", "Mods/a:b", "Mods/CON", "Mods/nul.txt", "Mods/Com1 .x", "Mods/CONIN$/x", "Mods/CONOUT$.txt", "Mods/a?b", "Mods/a*", "Mods/a|b", "Mods/a<b", "Mods/a\x01b", "Mods/\x01x", "Mods/\x00", "Mods/\x7fx", "Mods/COM¹", "Mods/lpt³.txt"} {
 		if _, err := openBytes(t, buildPak(t, 18, []fixtureFile{{name: name, data: []byte("x"), comp: CompressionNone}})); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%q: want ErrInvalid, got %v", name, err)
 		}
@@ -344,6 +344,24 @@ type zeroReaderAt struct{ read int }
 func (z *zeroReaderAt) ReadAt(b []byte, _ int64) (int, error) {
 	z.read += len(b)
 	return len(b), nil
+}
+
+func TestReadLargeCompressed(t *testing.T) {
+	t.Parallel()
+
+	payload := bytes.Repeat([]byte("baldur's gate 3 "), 4097)
+
+	for _, comp := range []Compression{CompressionZlib, CompressionLZ4} {
+		p, err := openBytes(t, buildPak(t, 18, []fixtureFile{{name: "big.bin", data: payload, comp: comp}}))
+		if err != nil {
+			t.Fatalf("compression %d: %v", comp, err)
+		}
+
+		got, err := p.Read("big.bin")
+		if err != nil || !bytes.Equal(got, payload) {
+			t.Fatalf("compression %d: %v", comp, err)
+		}
+	}
 }
 
 func TestReadRefusesOversizedLZ4DiskSize(t *testing.T) {
