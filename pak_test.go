@@ -183,6 +183,32 @@ func TestOpenFile(t *testing.T) {
 	if b, err := p.Read("a.txt"); err != nil || string(b) != "hi" {
 		t.Fatalf("%q %v", b, err)
 	}
+
+	if _, err := OpenFile(filepath.Join(t.TempDir(), "missing.pak")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing: %v", err)
+	}
+
+	bad := filepath.Join(t.TempDir(), "bad.pak")
+	if err := os.WriteFile(bad, []byte("not lspk"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := OpenFile(bad); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("corrupt: %v", err)
+	}
+}
+
+func TestCloseIsNoOpForPackagesOpenedFromAReader(t *testing.T) {
+	t.Parallel()
+
+	p, err := openBytes(t, buildPak(t, 18, []fixtureFile{{name: "a", data: []byte("x"), comp: CompressionNone}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := p.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestOpenRejectsHostileInput(t *testing.T) {
@@ -217,6 +243,19 @@ func TestOpenRejectsHostileInput(t *testing.T) {
 			return b
 		}), ErrInvalid},
 		{"truncated", good[:len(good)-5], ErrInvalid},
+		{"list compressed size past table", mutate(func(b []byte) []byte {
+			off := binary.LittleEndian.Uint64(b[8:])
+			binary.LittleEndian.PutUint32(b[off+4:], 0xffffffff)
+
+			return b
+		}), ErrInvalid},
+		{"file list not lz4", mutate(func(b []byte) []byte {
+			off := binary.LittleEndian.Uint64(b[8:])
+			b[off+8] ^= 0xff
+
+			return b
+		}), ErrInvalid},
+		{"entry data past end", buildPak(t, 18, []fixtureFile{{name: "a.txt", data: []byte("x"), offset: 1 << 40, comp: CompressionNone}}), ErrInvalid},
 	}
 
 	for _, tc := range cases {
@@ -228,6 +267,24 @@ func TestOpenRejectsHostileInput(t *testing.T) {
 			}
 		})
 	}
+
+	if _, err := Open(bytes.NewReader(nil), -1); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("negative size: %v", err)
+	}
+
+	if _, err := Open(listReadFailer{hdr: good}, int64(len(good))); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("unreadable file list: %v", err)
+	}
+}
+
+type listReadFailer struct{ hdr []byte }
+
+func (l listReadFailer) ReadAt(p []byte, off int64) (int, error) {
+	if off == 0 {
+		return copy(p, l.hdr), nil
+	}
+
+	return 0, errors.New("file list unreadable")
 }
 
 func TestOpenRejectsUnsafePathsAndBounds(t *testing.T) {
@@ -288,7 +345,45 @@ func TestReadBadEntries(t *testing.T) {
 	if _, err := p.Read("z.bin"); !errors.Is(err, ErrUnsupported) {
 		t.Errorf("zstd: %v", err)
 	}
+
+	p.entries[1].Compression = 9
+	if _, err := p.Read("z.bin"); !errors.Is(err, ErrUnsupported) {
+		t.Errorf("unknown compression: %v", err)
+	}
 }
+
+func TestReadRejectsStreamsThatDoNotMatchRecordedSize(t *testing.T) {
+	t.Parallel()
+
+	p, err := openBytes(t, buildPak(t, 18, []fixtureFile{{name: "raw.bin", data: []byte("hello"), comp: CompressionNone}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p.entries[0].Size = 2
+	if _, err := p.Read("raw.bin"); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("longer than recorded: %v", err)
+	}
+
+	p.entries[0].Size = 5
+	p.entries[0].Compression = CompressionZlib
+	if _, err := p.Read("raw.bin"); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("not zlib: %v", err)
+	}
+}
+
+func TestReadReportsAnUnreadableLZ4Payload(t *testing.T) {
+	t.Parallel()
+
+	p := &Pak{r: errAt{}, entries: []Entry{{Path: "a", Size: 10, Compression: CompressionLZ4, diskSize: 8}}}
+	if _, err := p.readEntry(&p.entries[0]); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("%v", err)
+	}
+}
+
+type errAt struct{}
+
+func (errAt) ReadAt([]byte, int64) (int, error) { return 0, errors.New("nope") }
 
 func FuzzOpen(f *testing.F) {
 	for _, v := range []uint32{15, 16, 18} {

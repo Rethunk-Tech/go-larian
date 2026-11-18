@@ -48,6 +48,7 @@ func TestParseMetaRejects(t *testing.T) {
 		"no module":   `<save><region id="Config"><node id="root"/></region></save>`,
 		"no uuid":     `<save><region id="Config"><node id="ModuleInfo"/></region></save>`,
 		"bad version": `<save><region id="Config"><node id="ModuleInfo"><attribute id="UUID" value="u"/><attribute id="Version64" value="-1"/></node></region></save>`,
+		"bad handle":  `<save><region id="Config"><node id="ModuleInfo"><attribute id="UUID" value="u"/><attribute id="PublishHandle" value="x"/></node></region></save>`,
 		"too big":     strings.Repeat(" ", maxLSXSize+1),
 	} {
 		if _, err := ParseMeta([]byte(in)); !errors.Is(err, ErrInvalid) {
@@ -70,6 +71,21 @@ func TestPakReadModuleInfo(t *testing.T) {
 
 	if m, err := p.ReadModuleInfo(); err != nil || m != tiny {
 		t.Fatalf("%+v %v", m, err)
+	}
+
+	p.entries[p.index["Mods/TinyMod/meta.lsx"]].Size = maxLSXSize + 1
+	if _, err := p.ReadModuleInfo(); !errors.Is(err, ErrInvalid) {
+		t.Errorf("oversize meta: %v", err)
+	}
+
+	raw, err := openBytes(t, buildPak(t, 18, []fixtureFile{{name: "Mods/TinyMod/meta.lsx", data: meta, comp: CompressionNone}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raw.entries[raw.index["Mods/TinyMod/meta.lsx"]].Compression = CompressionZlib
+	if _, err := raw.ReadModuleInfo(); !errors.Is(err, ErrInvalid) {
+		t.Errorf("unreadable meta: %v", err)
 	}
 
 	none, _ := openBytes(t, buildPak(t, 18, []fixtureFile{{name: "a", data: []byte("x"), comp: CompressionNone}}))
@@ -99,6 +115,45 @@ func TestModSettingsRoundTrip(t *testing.T) {
 
 	if !bytes.Equal(FormatModSettings(back), out) {
 		t.Error("format is not stable")
+	}
+}
+
+func TestParseModSettingsSkipsNonLoadOrderNodes(t *testing.T) {
+	t.Parallel()
+
+	in := `<save>
+<region id="Other"><node id="Mods"><children>
+  <node id="ModuleShortDesc"><attribute id="UUID" value="skip"/></node>
+</children></node></region>
+<region id="ModuleSettings"><node id="root"><children>
+  <node id="Mods"><children>
+    <node id="Config"><attribute id="UUID" value="not-a-mod"/></node>
+    <node id="ModuleShortDesc"><attribute id="UUID" value="keep"/><attribute id="Name" value="Keep"/></node>
+  </children></node>
+</children></node></region></save>`
+
+	mods, err := ParseModSettings([]byte(in))
+	if err != nil || len(mods) != 1 || mods[0].UUID != "keep" {
+		t.Fatalf("%+v %v", mods, err)
+	}
+
+	empty, err := ParseModSettings([]byte(`<save><region id="ModuleSettings"><node id="root"/></region></save>`))
+	if err != nil || len(empty) != 0 {
+		t.Fatalf("no Mods node: %+v %v", empty, err)
+	}
+}
+
+func TestParseModSettingsRejectsMalformedDocuments(t *testing.T) {
+	t.Parallel()
+
+	for name, in := range map[string]string{
+		"not xml":     "nope",
+		"bad version": `<save><region id="ModuleSettings"><node id="Mods"><children><node id="ModuleShortDesc"><attribute id="UUID" value="u"/><attribute id="Version64" value="-1"/></node></children></node></region></save>`,
+		"bad handle":  `<save><region id="ModuleSettings"><node id="Mods"><children><node id="ModuleShortDesc"><attribute id="UUID" value="u"/><attribute id="PublishHandle" value="x"/></node></children></node></region></save>`,
+	} {
+		if _, err := ParseModSettings([]byte(in)); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%s: %v", name, err)
+		}
 	}
 }
 
