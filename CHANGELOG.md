@@ -6,6 +6,12 @@ Notable changes to `go-larian`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `pak.Open` refuses entries that differ only by case, and a decompressed read grows with its output, not the claimed size.
+- `pak` rejects zlib streams with a bad checksum, Windows-reserved characters, superscript device names, and `CONIN$` and `CONOUT$` path segments.
+- `lsx` `Version64` parses as uint64, so a major of 256 or more is accepted.
+
 ## [0.1.2] - 2026-11-07
 
 ### Added
