@@ -10,7 +10,7 @@ tool (
 	golang.org/x/vuln/cmd/govulncheck
 )
 
-require github.com/pierrec/lz4/v4 v4.1.33
+require github.com/pierrec/lz4/v4 v4.1.34
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.4.0 // indirect
@@ -207,7 +207,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
-	golang.org/x/exp/typeparams v0.0.0-20261120182113-8801fbdfac81 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20261121134650-e1094eeca1b5 // indirect
 	golang.org/x/mod v0.43.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
