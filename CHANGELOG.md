@@ -6,6 +6,8 @@ Notable changes to `go-larian`. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-21
+
 ### Fixed
 
 - `pak.Open` refuses entries that differ only by case, and a decompressed read grows with its output, not the claimed size.
@@ -38,7 +40,8 @@ Notable changes to `go-larian`. The format follows
 - Parse and write `modsettings.lsx` load orders (`ParseModSettings`, `FormatModSettings`).
 - `lariantest.BuildPak`: build in-memory LSPK v15, v16 and v18 fixtures for tests.
 
-[Unreleased]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rethunk-Tech/go-larian/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rethunk-Tech/go-larian/releases/tag/v0.1.0
